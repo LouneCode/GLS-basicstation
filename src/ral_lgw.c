@@ -333,6 +333,9 @@ static void rxpolling (tmr_t* tmr) {
         rxjob->xtime = ts_xticks2xtime(pkt_rx.count_us, last_xtime);
 #if defined(CFG_sx1302)
         rxjob->rssi  = (u1_t)-pkt_rx.rssis;
+
+        // Set fine timestamp on
+        rxjob->fts = pkt_rx.ftime_received ? (u4_t)pkt_rx.ftime : -1;
 #else
         rxjob->rssi  = (u1_t)-pkt_rx.rssi;
 #endif

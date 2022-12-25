@@ -1,6 +1,171 @@
-[![regr-tests](https://github.com/lorabasics/basicstation/actions/workflows/regr-tests.yml/badge.svg?branch=master)](https://github.com/lorabasics/basicstation/actions/workflows/regr-tests.yml?query=branch%3Amaster)
+# GLS Basic Station - with a fine timestamp support
 
-# LoRa Basics™ Station
+Repository provides an idea how to enable (TOA) fine timestamp support with LoRa Basics™ Station v2.0.6. See details on [V2.0.6.1 Release note](https://github.com/LouneCode/GLS-basicstation/releases/tag/v2.0.6.1). 
+
+## Basic Station
+The concentrator desing is [Corecell](https://doc.sm.tc/station/gw_corecell.html) and hardware is based on the Semtech SX1303 or SX1302 chip. This concept has been tested on a Semtech SX1303 reference design board with an external EBYTE GN02 GPS module generating PPS pulse.
+
+### LNS test environment software stack - this repository not cover details of the ChirpStack test environment configuration
+- GLS basicstation (https://github.com/LouneCode/GLS-basicstation) 
+- ChirpStack v4 + modified GLS ChirpStack Gateway Bridge. Chirpstack gateway bridge need some changes to work with GLS basicstation and fine timestamp configuration (a link to the GLS ChirpStack Gateway Bridge repository will be added maybe here later...)
+
+## Documentation
+See LoRa Basics™ station [documentation](https://github.com/LouneCode/GLS-basicstation/edit/master/README.md#documentation-1) and compilation instructions below.
+
+### Cloning the GLS Basic Station Repository
+
+``` sourceCode
+git clone https://github.com/LouneCode/GLS-basicstation.git
+```
+
+### Compiling the GLS Basic Station Binary
+
+``` sourceCode
+cd GLS-basicstation
+make platform=corecell variant=std
+```
+
+#### Add following Configuration files in basicstation folder to use GLS Basic Station with ChirpStack:
+Set "pps" property to true in "SX1302_conf" section to enable the Fine timestamping functionality. All the following configuration files are examples only and should be reviewed and modified according to the Basic Station configuration used.
+* station.conf
+ 
+``` sourceCode
+{
+    "SX1302_conf": {
+        "device": "usb:/dev/ttyACM0",
+        "lorawan_public": true,
+        "clksrc": 0,
+        "full_duplex": false,
+        "pps": true,
+        "radio_0": {
+            "type": "SX1250",
+            "rssi_offset": -215.4,
+            "rssi_tcomp": {"coeff_a": 0, "coeff_b": 0, "coeff_c": 20.41, "coeff_d": 2162.56, "coeff_e": 0},
+            "tx_enable": true,
+            "antenna_gain": 0,
+            "tx_gain_lut":[
+                {"rf_power": 12, "pa_gain": 0, "pwr_idx": 15},
+                {"rf_power": 13, "pa_gain": 0, "pwr_idx": 16},
+                {"rf_power": 14, "pa_gain": 0, "pwr_idx": 17},
+                {"rf_power": 15, "pa_gain": 0, "pwr_idx": 19},
+                {"rf_power": 16, "pa_gain": 0, "pwr_idx": 20},
+                {"rf_power": 17, "pa_gain": 0, "pwr_idx": 22},
+                {"rf_power": 18, "pa_gain": 1, "pwr_idx": 1},
+                {"rf_power": 19, "pa_gain": 1, "pwr_idx": 2},
+                {"rf_power": 20, "pa_gain": 1, "pwr_idx": 3},
+                {"rf_power": 21, "pa_gain": 1, "pwr_idx": 4},
+                {"rf_power": 22, "pa_gain": 1, "pwr_idx": 5},
+                {"rf_power": 23, "pa_gain": 1, "pwr_idx": 6},
+                {"rf_power": 24, "pa_gain": 1, "pwr_idx": 7},
+                {"rf_power": 25, "pa_gain": 1, "pwr_idx": 9},
+                {"rf_power": 26, "pa_gain": 1, "pwr_idx": 11},
+                {"rf_power": 27, "pa_gain": 1, "pwr_idx": 14}
+            ]
+        },
+        "radio_1": {
+            "type": "SX1250",
+            "rssi_offset": -215.4,
+            "rssi_tcomp": {"coeff_a": 0, "coeff_b": 0, "coeff_c": 20.41, "coeff_d": 2162.56, "coeff_e": 0},
+            "tx_enable": false
+        }
+    },
+    "station_conf": {
+        "routerid": "0016F001FF1F0FEE",
+        "RADIO_INIT_WAIT": "5s",
+        "RX_POLL_INTV": "10ms",
+        "TC_TIMEOUT": "360s",
+        "log_file":  "stderr",
+        "log_level": "XDEBUG",
+        "log_size":  10000000,
+        "log_rotate":  3
+    }
+
+}
+```
+
+* tc.key
+``` sourceCode
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjaGlycHN0YWNrIiwiaXNzIjoiY2hpcnBzdGFjayIsInN1YiI6Ijk0Mjg4NDA3LTFjYzUtNGViMC...
+```
+
+* tc.uri
+``` sourceCode
+ws://192.168.1.130:3001
+```
+
+### Running compiled code from the command line
+``` sourceCode
+sudo ./build-corecell-std/bin/station
+```
+
+### If everything went well, the log will show something like this ... 
+``` sourceCode
+---
+2022-12-19 17:17:46.690 [RAL:INFO] Fine timestamp enabled.
+---
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:275] Packet checksum OK (0x79)
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:311] -----------------
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:312]   modem:      9
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:313]   chan:       5
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:314]   size:       37
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:315]   crc_en:     1
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:316]   crc_err:    0
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:317]   sync_err:   0
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:318]   hdr_err:    0
+---
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:319]   timing_set: 1
+---
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:320]   codr:       1
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:321]   datr:       7
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:322]   num_ts:     30
+2022-12-19 17:20:14.782 [HAL:XDEB] [rx_buffer_pop:324]   ts_avg:
+---
+2022-12-19 17:20:14.783 [HAL:XDEB] [sx1302_parse:1959] Note: LoRa packet (modem 9 chan 5)
+2022-12-19 17:20:14.783 [HAL:XDEB] [sx1302_parse:1981] Payload CRC check OK (0xCC3C)
+2022-12-19 17:20:14.783 [HAL:XDEB] [precision_timestamp_correction:253] FTIME ON : timestamp correction 61421
+2022-12-19 17:20:14.785 [HAL:XDEB] [precise_timestamp_calculate:587] ==> timestamp_pps => 362418142
+2022-12-19 17:20:14.785 [HAL:XDEB] [precise_timestamp_calculate:605] timestamp_cnt : 384430325
+2022-12-19 17:20:14.785 [HAL:XDEB] [precise_timestamp_calculate:606] timestamp_pps : 362418142
+2022-12-19 17:20:14.785 [HAL:XDEB] [precise_timestamp_calculate:607] diff_pps : 22012183
+2022-12-19 17:20:14.785 [HAL:XDEB] [precise_timestamp_calculate:611] pkt_ftime = 22012180.733333
+2022-12-19 17:20:14.785 [HAL:XDEB] [precise_timestamp_calculate:628] ==> ftime = 687880518 ns since last PPS (687880518.939069867134094)
+2022-12-19 17:20:14.785 [HAL:XDEB] [sx1302_rssi_get_temperature_offset:2283] INFO: RSSI temperature compensation:
+2022-12-19 17:20:14.785 [HAL:XDEB] [sx1302_rssi_get_temperature_offset:2284]        coeff_a: 0.000
+2022-12-19 17:20:14.785 [HAL:XDEB] [sx1302_rssi_get_temperature_offset:2285]        coeff_b: 0.000
+2022-12-19 17:20:14.785 [HAL:XDEB] [sx1302_rssi_get_temperature_offset:2286]        coeff_c: 20.410
+2022-12-19 17:20:14.785 [HAL:XDEB] [sx1302_rssi_get_temperature_offset:2287]        coeff_d: 2162.560
+2022-12-19 17:20:14.785 [HAL:XDEB] [sx1302_rssi_get_temperature_offset:2288]        coeff_e: 0.000
+2022-12-19 17:20:14.785 [HAL:XDEB] [lgw_receive:1320] INFO: RSSI temperature offset applied: 1.124 dB (current temperature 27.1 C)
+2022-12-19 17:20:14.785 [HAL:XDEB] [lgw_receive:1323] INFO: nb pkt found:1 left:1
+2022-12-19 17:20:14.785 [HAL:XDEB] [merge_packets:340] <----- Searching for DUPLICATEs ------
+2022-12-19 17:20:14.785 [HAL:XDEB] [merge_packets:343]   0: tmst=146305065 SF=7 CRC_status=16 freq=868100000 chan=5
+---
+2022-12-19 17:20:14.785 [HAL:XDEB] [merge_packets:345]  ftime=687880518
+---
+2022-12-19 17:20:14.785 [HAL:XDEB] [merge_packets:425] 0 elements swapped during sorting...
+2022-12-19 17:20:14.785 [HAL:XDEB] [merge_packets:430] --
+2022-12-19 17:20:14.785 [HAL:XDEB] [merge_packets:433]   0: tmst=146305065 SF=7 CRC_status=16 freq=868100000 chan=5
+2022-12-19 17:20:14.785 [HAL:XDEB] [merge_packets:435]  ftime=687880518
+2022-12-19 17:20:14.785 [HAL:XDEB] [merge_packets:441]  ------------------------------------>
+---
+2022-12-19 17:20:14.792 [RAL:XDEB] [CRC OK] 868.100MHz 13.75/-45.3 SF7/BW125 (mod=16/dr=7/bw=4) xtick=08b8702a (146305066) 37 bytes: 401032B50080100502EF892139DAF173F4B91023FC1856702277375E797CF865FF30CFB69B
+---
+2022-12-19 17:20:14.792 [S2E:DEBU] Copy the fine timestamp [687880518] of the previous mirror frame before drop it.
+---
+2022-12-19 17:20:14.792 [S2E:DEBU] Dropped mirror frame freq=868.1MHz snr= 11.5 rssi=-45 (vs. freq=868.1MHz snr= 13.8 rssi=-45) - DR5 mic=-1682518224 (37 bytes)
+2022-12-19 17:20:14.797 [S2E:VERB] RX 868.1MHz DR5 SF7/BW125 snr=13.8 rssi=-45 xtime=0xB8000008B8702A fts=687880518 - updf mhdr=40 DevAddr=00B53210 FCtrl=80 FCnt=1296 FOpts=[] 02EF8921..65FF mic=-1682518224 (37 bytes)
+
+2022-12-19 17:20:14.797 [AIO:XDEB] [3|WS] > {"msgtype":"updf","MHdr":64,"DevAddr":11874832,"FCtrl":128,"FCnt":1296,"FOpts":"","FPort":2,"FRMPayload":"EF892139DAF173F4B91023FC1856702277375E797CF865FF","MIC":-1682518224,"RefTime":0.000000,"DR":5,"Freq":868100000,"upinfo":{"rctx":0,"xtime":51791395861065770,"gpstime":1355505632761772,"fts":687880518,"rssi":-45,"snr":13.75,"rxtime":1671470414.687880516}}
+---
+```
+
+**Fine timestamp in the web socket message** ---> "fts":687880518 
+``` sourceCode
+2022-12-19 17:20:14.797 [AIO:XDEB] [3|WS] > {"msgtype":"updf","MHdr":64, --- "fts":687880518 --- ,"rssi":-45,"snr":13.75,"rxtime":1671470414.687880516}}
+```
+
+# LoRa Basics™ Station 
+[![regr-tests](https://github.com/lorabasics/basicstation/actions/workflows/regr-tests.yml/badge.svg?branch=master)](https://github.com/lorabasics/basicstation/actions/workflows/regr-tests.yml?query=branch%3Amaster)
 
 [Basic Station](https://doc.sm.tc/station) is a LoRaWAN Gateway implementation, including features like
 

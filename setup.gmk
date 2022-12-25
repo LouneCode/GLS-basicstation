@@ -43,7 +43,7 @@ LOCAL_ARCH := $(shell gcc -dumpmachine)
 ARCH.linux   = x86_64-linux-gnu
 ARCH.linuxV2 = x86_64-linux-gnu
 ARCH.linuxpico = x86_64-linux-gnu
-ARCH.corecell  = arm-linux-gnueabihf
+ARCH.corecell  = x86_64-linux-gnu
 ARCH.rpi     = arm-linux-gnueabihf
 ARCH.kerlink = arm-klk-linux-gnueabi
 ARCH=${ARCH.${platform}}
@@ -81,8 +81,8 @@ endif
 BD=build-${platform}-${variant}
 
 # -- Architecture specific
-CFG.arm-linux-gnueabihf = linux
-# CFG.x86_64-linux-gnu    = linux
+# CFG.arm-linux-gnueabihf = linux
+CFG.x86_64-linux-gnu    = linux
 
 # -- Variant specific
 #  testsim runs libloragw inside master process
