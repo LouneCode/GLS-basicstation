@@ -60,6 +60,7 @@ This repository not cover details of the GLS ChirpStack test environment configu
 
 ``` sourceCode
 $ git clone https://github.com/LouneCode/gls-basicstation.git
+
 ```
 
 &nbsp;
@@ -69,6 +70,7 @@ $ git clone https://github.com/LouneCode/gls-basicstation.git
 Go gls-basicstation folder after cloning the repository. Give following commands on command line. 
 
 ``` sourceCode
+
 $ cd gls-basicstation
 $ sudo docker build --network host --build-arg VARIANT=std . -t gls-basicstation:2.0.6.1
 ```
