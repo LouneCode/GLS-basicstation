@@ -47,7 +47,7 @@ This repository not cover details of the GLS ChirpStack test environment configu
 &nbsp;
 
 ## Documentation
-- LoRa Basics™ station [https://github.com/lorabasics/basicstation) and compilation instructions.
+- LoRa Basics™ station [documentation](https://github.com/lorabasics/basicstation) and compilation instructions.
 
 - [Concentrator Corecell desing](https://lora-developers.semtech.com/build/software/lora-basics/lora-basics-for-gateways/?url=gw_corecell.html)
 
