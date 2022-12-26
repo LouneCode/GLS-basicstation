@@ -1,32 +1,234 @@
-# GLS Basic Station - with a fine timestamp support
+# GLS Basic Station - with the Fine timestamp support
+This repository provides an **idea** how to add (TDOA) fine timestamp support on LoRa Basics™ Station v2.0.6 version. Repository presents perhaps the world's first (public) implementation of the Basic Station with a Fine timestamp ;). The Concept is still in testing phase, so **please do not use this example implementation in production**.
 
-Repository provides an idea how to enable (TOA) fine timestamp support with LoRa Basics™ Station v2.0.6. See details on [V2.0.6.1 Release note](https://github.com/LouneCode/GLS-basicstation/releases/tag/v2.0.6.1). 
+Repository of the original LoRa Basics™ Station implementation can be found [here](https://github.com/lorabasics/basicstation).
 
-## Basic Station
-The concentrator desing is [Corecell](https://doc.sm.tc/station/gw_corecell.html) and hardware is based on the Semtech SX1303 or SX1302 chip. This concept has been tested on a Semtech SX1303 reference design board with an external EBYTE GN02 GPS module generating PPS pulse.
+Documentation about the Concentrator Corecell desing found [here](https://lora-developers.semtech.com/build/software/lora-basics/lora-basics-for-gateways/?url=gw_corecell.html).
 
-### LNS test environment software stack - this repository not cover details of the ChirpStack test environment configuration
-- GLS basicstation (https://github.com/LouneCode/GLS-basicstation) 
-- ChirpStack v4 + modified GLS ChirpStack Gateway Bridge. Chirpstack gateway bridge need some changes to work with GLS basicstation and fine timestamp configuration (a link to the GLS ChirpStack Gateway Bridge repository will be added maybe here later...)
+Another very good repository on this topic is [xoseperez/basicstation](https://github.com/xoseperez/basicstation).  
 
-## Documentation
-See LoRa Basics™ station [documentation](https://github.com/LouneCode/GLS-basicstation/edit/master/README.md#documentation-1) and compilation instructions below.
+&nbsp;
 
-### Cloning the GLS Basic Station Repository
+#
+## GLS Basic Station
+GLS Basic Station enables The Fine timestamp functionality **if** consentrator hardware basis on the Semtech **SX1303** or **SX1302** chip and Semtech Corecell Desing. Concept has been tested on a Semtech SX1303 reference design board with an external EBYTE GN02 GPS module generating PPS pulse.
 
-``` sourceCode
-git clone https://github.com/LouneCode/GLS-basicstation.git
+ Testing has been done on [ChirpStack](https://www.chirpstack.io/) v4 LoRaWAN® Network Server + GLS ChirpStack Gateway Bridge + GLS Basic Station back end combination. GLS ChirpStack Gateway Bridge is modified version of the original [Chirpstack gateway bridge](https://www.chirpstack.io/gateway-bridge/community/source/) and it enables the fineTimeSinceGpsEpoch field in uplink event JSON messages with nanosecond precision as follows:
+
+ &nbsp;
+
+ ``` sourceCode
+ ...
+"rxInfo": [
+    {
+        "gatewayId": "0016c001ffxxxxxx",
+        "uplinkId": 3232276575,
+        "time": "2022-12-26T12:01:47.709920+00:00",
+        "timeSinceGpsEpoch": "1356091325.709920s",
+        "fineTimeSinceGpsEpoch": "1356091325.263021396s",
+        "rssi": -45,
+        "snr": 14.25,
+        "location": {
+            "latitude": 62.1979847889177,
+            "longitude": 21.123254060745244
+        },
+        "context": "AAAAAAAAAAAAMgABVWHvOA==",
+        "metadata": {
+            "region_common_name": "EU868",
+            "region_name": "eu868"
+        }
+    },
+...
 ```
 
-### Compiling the GLS Basic Station Binary
+&nbsp;
+
+This repository not cover details of the GLS ChirpStack test environment configuration. But anyway, the [Chirpstack gateway bridge](https://www.chirpstack.io/gateway-bridge/community/source/) needs to some code changes to work together with the GLS Base Station implemetation. (**GLS ChirpStack Gateway Bridge** repository will be published maybe later and the link to the implementation will be added here...)
+
+&nbsp;
+
+#
+## Documentation
+- LoRa Basics™ station [documentation](https://github.com/LouneCode/GLS-basicstation/edit/master/README.md#documentation-1) and compilation instructions.
+
+- [Concentrator Corecell desing](https://lora-developers.semtech.com/build/software/lora-basics/lora-basics-for-gateways/?url=gw_corecell.html)
+
+&nbsp;
+
+#
+## Cloning the GLS Basic Station repository
+
+&nbsp;
 
 ``` sourceCode
-cd GLS-basicstation
+$ git clone https://github.com/LouneCode/gls-basicstation.git
+```
+
+&nbsp;
+
+## Compilling Docker image (x86_64-linux-gnu)
+
+Go gls-basicstation folder after cloning the repository. Give following commands on command line. 
+
+``` sourceCode
+$ cd gls-basicstation
+$ sudo docker build --network host --build-arg VARIANT=std . -t gls-basicstation:2.0.6.1
+```
+&nbsp;
+
+Check images of the container after copilation phase.
+
+``` sourceCode
+$ docker image ls
+
+REPOSITORY                                            TAG             IMAGE ID       CREATED         SIZE
+gls-basicstation                                      2.0.6.1         7bb80ff343b9   26 hours ago    90.4MB
+...
+
+```
+
+&nbsp;
+
+Configure and run gls-basicstation image in Docker.
+
+``` sourceCode
+
+$ sudo docker run -d --name=gls-basicstation --device=/dev/ttyACM1:/dev/ttyACM1 \
+  --restart=unless-stopped --network=host -e TC_URI="ws://192.168.1.100:3001" \
+  -e MODEL="SX1303" -e INTERFACE="USB" -e DESIGN="CORECELL" \
+  -e DEVICE="/dev/ttyACM1" -e GATEWAY_EUI="E45F01FFFE1DDCAA" \
+  -e TC_KEY="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1fhifq-CeXj1GMMZc......."  \
+  gls-basicstation:2.0.6.1
+  
+```
+
+&nbsp;
+
+## Environment variables of the Docker run command
+
+&nbsp;
+
+List of environment variables (-e VARIABLE) of Docker run command  
+Only `MODEL` and `TC_KEY` are mandatory.
+
+Variable Name | Value | Description | Default
+------------ | ------------- | ------------- | -------------
+**`MODEL`** | `STRING` | Concentrator model (see `Define your MODEL` section below) | `SX1303`
+**`INTERFACE`** | `SPI` or `USB` | Concentrator interface | `SPI`
+**`DESIGN`** | `CORECELL` | Concentrator design version | A fair guess will be done based on `MODEL` and `INTERFACE`
+**`DEVICE`** | `STRING` | Where the concentrator is connected to | `/dev/spidev0.0` for SPI, `/dev/ttyACM0` for USB
+**`USE_LIBGPIOD`** | `INT` | Use `libgpiod` (1) instead of default `sysfs` (0) to manage the GPIOs. The former is the recommended but not yet supported on all platforms. | 0
+**`GW_RESET_GPIO`** | `INT` | GPIO number that resets (Broadcom pin number, if not defined it's calculated based on the `GW_RESET_PIN`) | 17
+**`GW_POWER_EN_GPIO`** | `INT` | GPIO number that enables power (by pulling HIGH) to the concentrator (Broadcom pin number). 0 means no required. | 0
+**`GW_POWER_EN_LOGIC`** | `INT` | If `GW_POWER_EN_GPIO` is not 0, the corresponding GPIO will be set to this value | 1
+**`GATEWAY_EUI_NIC`** | `STRING` | Interface to use when generating the EUI | `eth0`
+**`GATEWAY_EUI`** | `STRING` | Gateway EUI to use | Autogenerated from `GATEWAY_EUI_NIC` if defined, otherwise in order 
+**`USE_CUPS`** | 0 or 1 | Set to 1 to force CUPS even without a CUPS_KEY variable or cups.key file | 0
+**`CUPS_URI`** | `STRING` | CUPS Server to connect to | Automatically created based on `SERVER`
+**`CUPS_TRUST`** | `STRING` | Certificate for the CUPS server | Precached certificate
+**`CUPS_KEY`** | `STRING` | Unique gateway key used to connect to the CUPS server | Paste API key from your provider
+**`TC_URI`** | `STRING` | LoRaWAN Network Server to connect to | Automatically created based on `SERVER`
+**`TC_KEY`** | `STRING` | Unique gateway key used to connect to the LNS | Paste API key from your LNS
+
+&nbsp;
+
+> At least `MODEL` and `TC_KEY` must be defined.
+
+> When using CUPS (setting `USE_CUPS` to 1 or defining the `CUPS_KEY` variable), LNS configuration is retrieved from the CUPS server, so you don't have to set the `TC_*` variables.
+
+&nbsp;
+
+### Define your MODEL & DESIGN
+
+The model is defined depending on the version of the LoRa concentrator chip: `SX1302` or `SX1303` . You can also use the concentrator module name or even the gateway model (for RAKwireless gateways). List of possible valid values:
+
+* Semtech chip model: SX1302, SX1303
+* Concentrator modules: RAK2287, RAK5146, RAK831, WM1302
+* RAK WisGate Development gateways: RAK7248, RAK7248C, RAK7271, RAK7371
+
+&nbsp;
+
+## Check Docker process and logs.
+
+&nbsp;
+
+``` sourceCode
+$ docker ps
+CONTAINER ID   IMAGE                      COMMAND           CREATED         STATUS         PORTS         NAMES
+9599e6bfaffc   gls-basicstation:2.0.6.1   "/app/start.sh"   7 minutes ago   Up 7 minutes                 gls-basicstation
+
+$  docker logs -f gls-basicstation
+
+------------------------------------------------------------------
+Protocol
+------------------------------------------------------------------
+Mode:          DYNAMIC
+Protocol:      LNS
+LNS Server:    ws://192.168.1.100:3001
+Gateway EUI:   E45F01FFFE1DDCAA
+------------------------------------------------------------------
+Radio
+------------------------------------------------------------------
+Model:         SX1303
+Concentrator:  SX1303
+Design:        CORECELL
+Radio Device:  /dev/ttyACM1
+Interface:     USB
+Reset GPIO:    0
+Enable GPIO:   0
+------------------------------------------------------------------
+2022-12-26 14:49:11.461 [SYS:INFO] Logging     : stderr (maxsize=10000000, rotate=3)
+2022-12-26 14:49:11.461 [SYS:INFO] Station Ver : 2.0.6(corecell/std) 2022-12-25 13:02:48
+2022-12-26 14:49:11.461 [SYS:INFO] Package Ver : (null)
+2022-12-26 14:49:11.461 [SYS:INFO] mbedTLS Ver : 2.28.0
+2022-12-26 14:49:11.461 [SYS:INFO] proto EUI   : e45f:1ff:fe1d:dc57     (station.conf)
+2022-12-26 14:49:11.461 [SYS:INFO] prefix EUI  : ::1    (builtin)
+2022-12-26 14:49:11.461 [SYS:INFO] Station EUI : e45f:1ff:fe1d:dc57
+2022-12-26 14:49:11.461 [SYS:INFO] Station home: ./     (builtin)
+2022-12-26 14:49:11.461 [SYS:INFO] Station temp: /var/tmp/      (builtin)
+2022-12-26 14:49:11.461 [SYS:WARN] Station in NO-CUPS mode
+2022-12-26 14:49:11.662 [TCE:INFO] Starting TC engine
+2022-12-26 14:49:11.662 [TCE:INFO] Connecting to INFOS: ws://192.168.1.176:3001
+2022-12-26 14:49:11.690 [TCE:INFO] Infos: e45f:01ff:fe1d:dc57 e45f:01ff:fe1d:dc57 ws://192.168.1.100:3001/gateway/e45f01fffe1ddc57
+2022-12-26 14:49:11.690 [AIO:DEBU] [3] ws_close reason=1000
+2022-12-26 14:49:11.690 [AIO:DEBU] [3] Connection closed unexpectedly
+2022-12-26 14:49:11.690 [AIO:DEBU] [3] WS connection shutdown...
+2022-12-26 14:49:11.691 [TCE:VERB] Connecting to MUXS...
+2022-12-26 14:49:11.707 [TCE:VERB] Connected to MUXS.
+...
+2022-12-26 14:49:11.723 [RAL:INFO] Fine timestamp enabled.
+...
+2022-12-26 14:49:11.731 [RAL:INFO] Station device: usb:/dev/ttyACM1 (PPS capture enabled)
+2022-12-26 14:49:11.731 [HAL:INFO] [lgw_com_open:88] Opening USB communication interface
+2022-12-26 14:49:11.731 [HAL:INFO] [lgw_usb_open:162] INFO: Configuring TTY
+2022-12-26 14:49:11.731 [HAL:INFO] [lgw_usb_open:171] INFO: Flushing TTY
+2022-12-26 14:49:11.731 [HAL:INFO] [lgw_usb_open:180] INFO: Setting TTY in blocking mode
+2022-12-26 14:49:11.731 [HAL:INFO] [lgw_usb_open:195] INFO: Connect to MCU
+2022-12-26 14:49:11.731 [HAL:INFO] [lgw_usb_open:203] INFO: Concentrator MCU version is V01.00.00
+2022-12-26 14:49:11.731 [HAL:INFO] [lgw_usb_open:210] INFO: MCU status: sys_time:237473297 temperature:26.8oC
+2022-12-26 14:49:11.733 [HAL:INFO] [lgw_connect:1192] chip version is 0x12 (v1.2)
+2022-12-26 14:49:13.978 [HAL:INFO] [timestamp_counter_mode:435] using precision timestamp (max_ts_metrics:32 nb_symbols:0)
+2022-12-26 14:49:14.225 [RAL:INFO] Concentrator started (2s494ms)
+...
+
+```
+
+&nbsp;
+
+## Compiling the GLS Basic Station Binary (x86_64-linux-gnu)
+
+Run the make command in gls-basicstation repository.
+
+``` sourceCode
+cd gls-basicstation
 make platform=corecell variant=std
 ```
+Detailed compilling instruction will be found in original [Basic Station](https://github.com/lorabasics/basicstation) repository.
 
-#### Add following Configuration files in basicstation folder to use GLS Basic Station with ChirpStack:
-Set "pps" property to true in "SX1302_conf" section to enable the Fine timestamping functionality. All the following configuration files are examples only and should be reviewed and modified according to the Basic Station configuration used.
+&nbsp;
+
+## Configuration files
+Add following Configuration files in basicstation folder before run binary. Set "pps" property to true in "SX1302_conf" section to enable the Fine timestamping functionality. All the following configuration files are examples only and should be reviewed and modified according to the Basic Station configuration used.
 * station.conf
  
 ``` sourceCode
@@ -90,15 +292,67 @@ Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjaGlycHN0Y
 
 * tc.uri
 ``` sourceCode
-ws://192.168.1.130:3001
+ws://192.168.1.100:3001
 ```
 
-### Running compiled code from the command line
+&nbsp;
+
+## Running compiled code from the command line
 ``` sourceCode
 sudo ./build-corecell-std/bin/station
 ```
 
-### If everything went well, the log will show something like this ... 
+&nbsp;
+
+The Station binary accepts the following command-line options:
+
+```
+Usage: station [OPTION...]
+
+  -d, --daemon               First check if another process is still alive. If
+                             so do nothing and exit. Otherwise fork a worker
+                             process to operate the radios and network
+                             protocols. If the subprocess died respawn it with
+                             an appropriate back off.
+  -f, --force                If a station process is already running, kill it
+                             before continuing with requested operation mode.
+  -h, --home=DIR             Home directory for configuration files. Default is
+                             the current working directory. Overrides
+                             environment STATION_DIR.
+  -i, --radio-init=cmd       Program/script to run before reinitializing radio
+                             hardware. By default nothing is being executed.
+                             Overrides environment STATION_RADIOINIT.
+  -k, --kill                 Kill a currently running station process.
+  -l, --log-level=LVL|0..7   Set a log level LVL=#loglvls# or use a numeric
+                             value. Overrides environment STATION_LOGLEVEL.
+  -L, --log-file=FILE[,SIZE[,ROT]]
+                             Write log entries to FILE. If FILE is '-' then
+                             write to stderr. Optionally followed by a max file
+                             SIZE and a number of rotation files. If ROT is 0
+                             then keep only FILE. If ROT is 1 then keep one
+                             more old log file around. Overrides environment
+                             STATION_LOGFILE.
+  -N, --no-tc                Do not connect to a LNS. Only run CUPS
+                             functionality.
+  -p, --params               Print current parameter settings.
+  -t, --temp=DIR             Temp directory for frequently written files.
+                             Default is /tmp. Overrides environment
+                             STATION_TEMPDIR.
+  -x, --eui-prefix=id6       Turn MAC address into EUI by adding this prefix.
+                             If the argument has value ff:fe00:0 then the EUI
+                             is formed by inserting FFFE in the middle. If
+                             absent use MAC or routerid as is. Overrides
+                             environment STATION_EUIPREFIX.
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -v, --version              Print station version.
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+```
+&nbsp;
+
+## If everything went well, the log will show something like this ... 
 ``` sourceCode
 ---
 2022-12-19 17:17:46.690 [RAL:INFO] Fine timestamp enabled.
@@ -158,176 +412,47 @@ sudo ./build-corecell-std/bin/station
 2022-12-19 17:20:14.797 [AIO:XDEB] [3|WS] > {"msgtype":"updf","MHdr":64,"DevAddr":11874832,"FCtrl":128,"FCnt":1296,"FOpts":"","FPort":2,"FRMPayload":"EF892139DAF173F4B91023FC1856702277375E797CF865FF","MIC":-1682518224,"RefTime":0.000000,"DR":5,"Freq":868100000,"upinfo":{"rctx":0,"xtime":51791395861065770,"gpstime":1355505632761772,"fts":687880518,"rssi":-45,"snr":13.75,"rxtime":1671470414.687880516}}
 ---
 ```
+&nbsp;
 
 **Fine timestamp in the web socket message** ---> "fts":687880518 
 ``` sourceCode
 2022-12-19 17:20:14.797 [AIO:XDEB] [3|WS] > {"msgtype":"updf","MHdr":64, --- "fts":687880518 --- ,"rssi":-45,"snr":13.75,"rxtime":1671470414.687880516}}
 ```
 
-# LoRa Basics™ Station 
-[![regr-tests](https://github.com/lorabasics/basicstation/actions/workflows/regr-tests.yml/badge.svg?branch=master)](https://github.com/lorabasics/basicstation/actions/workflows/regr-tests.yml?query=branch%3Amaster)
+&nbsp;
 
-[Basic Station](https://doc.sm.tc/station) is a LoRaWAN Gateway implementation, including features like
+## Attribution
 
-*  **Ready for LoRaWAN Classes A, B, and C**
-*  **Unified Radio Abstraction Layer supporting Concentrator Reference Designs [v1.5](https://doc.sm.tc/station/gw_v1.5.html), [v2](https://doc.sm.tc/station/gw_v2.html) and [Corecell](https://doc.sm.tc/station/gw_corecell.html)**
+- This is an adaptation of the [Semtech Basics Station repository](https://github.com/lorabasics/basicstation). See the [documentation](https://doc.sm.tc/station).
+- Docker image compilation scripts bases on excellent work done by [xoseperez/basicstation](https://github.com/xoseperez/basicstation)
 
-*  **Powerful Backend Protocols** (read [here](https://doc.sm.tc/station/tcproto.html) and [here](https://doc.sm.tc/station/cupsproto.html))
-    -  Centralized update and configuration management
-    -  Centralized channel-plan management
-    -  Centralized time synchronization and transfer
-    -  Various authentication schemes (client certificate, auth tokens)
-    -  Remote interactive shell
+## License
 
-*  **Lean Design**
-    -  No external software dependencies (except mbedTLS and libloragw/-v2)
-    -  Portable C code, no C++, dependent only on GNU libc
-    -  Easily portable to Linux-based gateways and embedded systems
-    -  No dependency on local time keeping
-    -  No need for incoming connections
+The contents of this repository (not of those repositories linked or used by this one) are under BSD 3-Clause License.
 
-## Documentation
+Copyright (c) 2022 LouneCode - Only husky in the village <postia.lounelle@live.com>
+All rights reserved.
 
-The full documentation is available at [https://doc.sm.tc/station](https://doc.sm.tc/station).
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-### High Level Architecture
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. Neither the name of this project nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
 
-![High Level Station Architecture](https://doc.sm.tc/station/_images/architecture.png)
-
-## Prerequisites
-
-Building the Station binary from source, requires
-
-* gcc (C11 with GNU extensions)
-* GNU make
-* git
-* bash
-
-## First Steps
-
-The following is a three-step quick start guide on how to build and run Station. It uses a Raspberry Pi as host platform and assumes a Concentrator Reference Design 1.5 compatible radio board connected via SPI, and assumes that SPI port is enabled using the [raspi-config](https://www.raspberrypi.org/documentation/configuration/raspi-config.md) tool. In this example the build process is done on the target platform itself (the make environment also supports cross compilation in which case the toolchain is expected in `~/toolchain-$platform` - see [setup.gmk](setup.gmk)).
-
-#### Step 1: Cloning the Station Repository
-
-``` sourceCode
-git clone https://github.com/lorabasics/basicstation.git
-```
-
-#### Step 2: Compiling the Station Binary
-
-``` sourceCode
-cd basicstation
-make platform=rpi variant=std
-```
-
-The build process consists of the following steps:
-
-*  Fetch and build dependencies, namely [mbedTLS](https://github.com/ARMmbed/mbedtls) and [libloragw](https://github.com/Lora-net/lora_gateway)
-*  Setup build environment within subdirectory `build-$platform-$variant/`
-*  Compile station source files into executable `build-$platform-$variant/bin/station`
-
-#### Step 3: Running the Example Configuration on a Raspberry Pi
-
-``` sourceCode
-cd examples/live-s2.sm.tc
-RADIODEV=/dev/spidev0.0 ../../build-rpi-std/bin/station
-```
-
-**Note:** The SPI device for the radio MAY be passed as an environment variable using `RADIODEV`.
-
-The example configuration connects to a public test server [s2.sm.tc](wss://s2.sm.tc) through which Station fetches all required credentials and a channel plan matching the region as determined from the IP address of the gateway. Provided there are active LoRa devices in proximity, received LoRa frames are printed in the log output on `stderr`.
-
-## Instruction for Supported Platfroms
-
-#### Corecell Platform (Raspberry Pi as HOST + [SX1302CxxxxGW Concentrator](https://www.semtech.com/products/wireless-rf/lora-gateways/sx1302cxxxgw1))
-
-##### Compile and Running the Example
-
-``` sourceCode
-cd basicstation
-make platform=corecell variant=std
-cd examples/corecell
-./start-station.sh -l ./lns-ttn
-```
-
-This example configuration for Corecell connects to [The Things Network](https://www.thethingsnetwork.org/) public LNS. The example [station.conf](station.conf) file holds the required radio configurations and station fetches the channel plan from the configured LNS url ([tc.uri](tc.uri)).
-
-Note: SPI port requires to be activated on Raspberry Pi thanks to [raspi-config](https://www.raspberrypi.org/documentation/configuration/raspi-config.md) tool.
-
-#### PicoCell Gateway (Linux OS as HOST + [SX1308 USB Reference design](https://www.semtech.com/products/wireless-rf/lora-gateways/sx1308p868gw))
-
-
-##### Compile and Running the Example
-
-``` sourceCode
-cd basicstation
-make platform=linuxpico variant=std
-cd examples/live-s2.sm.tc
-RADIODEV=/dev/ttyACM0 ../../build-linuxpico-std/bin/station
-```
-
-**Note:** The serial device for the PicoCell MAY be passed as an environment variable using `RADIODEV`.
-
-## Next Steps
-
-Next,
-
-*  consult the help menu of Station via `station --help`,
-*  inspect the `station.conf` and `cups-boot.*` [example configuration files](/examples/live-s2.sm.tc),
-*  tune your local [configuration](https://doc.sm.tc/station/conf.html),
-*  learn how to [compile Station](https://doc.sm.tc/station/compile.html) for your target platform.
-
-Check out the other examples:
-
-*  [Simulation Example](/examples/simulation) - An introduction to the simulation environment.
-*  [CUPS Example](/examples/cups) - Demonstration of the CUPS protocol within the simulation environment.
-*  [Station to Pkfwd Protocol Bridge Example](/examples/station2pkfwd) - Connect Basic Station to LNS supporting the legacy protocol.
-
-## Usage
-
-The Station binary accepts the following command-line options:
-
-```
-Usage: station [OPTION...]
-
-  -d, --daemon               First check if another process is still alive. If
-                             so do nothing and exit. Otherwise fork a worker
-                             process to operate the radios and network
-                             protocols. If the subprocess died respawn it with
-                             an appropriate back off.
-  -f, --force                If a station process is already running, kill it
-                             before continuing with requested operation mode.
-  -h, --home=DIR             Home directory for configuration files. Default is
-                             the current working directory. Overrides
-                             environment STATION_DIR.
-  -i, --radio-init=cmd       Program/script to run before reinitializing radio
-                             hardware. By default nothing is being executed.
-                             Overrides environment STATION_RADIOINIT.
-  -k, --kill                 Kill a currently running station process.
-  -l, --log-level=LVL|0..7   Set a log level LVL=#loglvls# or use a numeric
-                             value. Overrides environment STATION_LOGLEVEL.
-  -L, --log-file=FILE[,SIZE[,ROT]]
-                             Write log entries to FILE. If FILE is '-' then
-                             write to stderr. Optionally followed by a max file
-                             SIZE and a number of rotation files. If ROT is 0
-                             then keep only FILE. If ROT is 1 then keep one
-                             more old log file around. Overrides environment
-                             STATION_LOGFILE.
-  -N, --no-tc                Do not connect to a LNS. Only run CUPS
-                             functionality.
-  -p, --params               Print current parameter settings.
-  -t, --temp=DIR             Temp directory for frequently written files.
-                             Default is /tmp. Overrides environment
-                             STATION_TEMPDIR.
-  -x, --eui-prefix=id6       Turn MAC address into EUI by adding this prefix.
-                             If the argument has value ff:fe00:0 then the EUI
-                             is formed by inserting FFFE in the middle. If
-                             absent use MAC or routerid as is. Overrides
-                             environment STATION_EUIPREFIX.
-  -?, --help                 Give this help list
-      --usage                Give a short usage message
-  -v, --version              Print station version.
-
-Mandatory or optional arguments to long options are also mandatory or optional
-for any corresponding short options.
-```
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
