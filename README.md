@@ -42,7 +42,7 @@ GLS Basic Station enables The Fine timestamp functionality **if** consentrator h
 
 &nbsp;
 
-This repository not cover details of the GLS ChirpStack test environment configuration. But anyway, the [Chirpstack gateway bridge](https://www.chirpstack.io/gateway-bridge/community/source/) needs to some code changes to work together with the GLS Base Station implemetation. (**GLS ChirpStack Gateway Bridge** repository will be published maybe later and the link to the implementation will be added here...)
+This repository not cover details of the GLS ChirpStack test environment configuration. But anyway, the [Chirpstack gateway bridge](https://www.chirpstack.io/gateway-bridge/community/source/) needs to some code changes to work together with the GLS Basic Station implemetation. (**GLS ChirpStack Gateway Bridge** repository will be published maybe later and the link to the implementation will be added here...)
 
 &nbsp;
 
@@ -215,7 +215,7 @@ Enable GPIO:   0
 
 &nbsp;
 
-## Compiling the GLS Basic Station Binary (x86_64-linux-gnu)
+## Compilling the GLS Basic Station Binary (x86_64-linux-gnu)
 
 Run the make command in gls-basicstation repository.
 
