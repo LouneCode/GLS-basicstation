@@ -1,0 +1,12 @@
+﻿diff --git a/src/aio.c b/src/aio.c
+index f6ddad7..7f78445 100644
+--- a/src/aio.c
++++ b/src/aio.c
+@@ -30,6 +30,7 @@
+ #include <time.h>
+ #include <errno.h>
+ #include <fcntl.h>
++#include <sys/select.h>
+ #include "rt.h"
+ 
+ 

@@ -1,24 +1,26 @@
-ARG ARCH=amd64
+# aarch64-alpine-linux-musl
+# x86_64-alpine-linux-musl
+ARG ARCH=x86_64-alpine-linux-musl
 ARG REMOTE_TAG=v2.0.6
 ARG VARIANT=std
 
-FROM ubuntu:22.04 as builder
+FROM alpine as builder
 
 ARG ARCH
 ARG REMOTE_TAG
 ARG VARIANT
 
 ENV container=docker TERM=xterm LC_ALL=en_US LANGUAGE=en_US LANG=en_US.UTF-8
-ENV DEBIAN_FRONTEND=noninteractive
+#ENV DEBIAN_FRONTEND=noninteractive
 
-# locale
-RUN apt-get update -q > /dev/null && \
-        apt-get install --no-install-recommends -yq apt-utils locales language-pack-en dialog \
-        > /dev/null && \
-        locale-gen $LANGUAGE $LANG && \
-        apt-get install --no-install-recommends -yq \
-        git curl psmisc build-essential manpages-dev ca-certificates && \
-        update-ca-certificates libc6
+# Install packages for build variant
+RUN apk add --update \
+        build-base \
+        git \
+        bash \
+        linux-headers \
+        argp-standalone && \
+        rm -rf /var/cache/apk/*
 
 # Work dir for GLS Basic Station
 WORKDIR /app
@@ -26,9 +28,16 @@ WORKDIR /app
 # Checkout and compile remote code
 COPY builder/* ./
 RUN chmod +x *.sh
+#COPY . basicstation/
 RUN ARCH=${ARCH} REMOTE_TAG=${REMOTE_TAG} VARIANT=${VARIANT} ./build.sh
+##RUN git clone https://github.com/LouneCode/gls-basicstation.git basicstation
+##COPY setup.gmk basicstation/.
+##COPY src/aio.c basicstation/src/.
+#RUN cd basicstation && make super-clean && make platform=corecell variant=std
+##RUN REMOTE_TAG=${REMOTE_TAG} VARIANT=${VARIANT} ./build.sh
 
-FROM ubuntu:22.04 as runner
+
+FROM alpine as runner
 ARG ARCH
 ARG REMOTE_TAG
 ARG VARIANT
@@ -47,24 +56,23 @@ LABEL org.label-schema.vcs-ref=${TAG}
 LABEL org.label-schema.arch=${ARCH}
 LABEL org.label-schema.license="BSD License 2.0"
 
-ENV container=docker TERM=xterm LC_ALL=en_US LANGUAGE=en_US LANG=en_US.UTF-8
-ENV DEBIAN_FRONTEND=noninteractive
+ENV container=docker TERM=xterm LC_ALL=en_US LANGUAGE=en_US LANG=en_US.UTF-8 TZ=Europe/Helsinki
+#ENV DEBIAN_FRONTEND=noninteractive
 
 # locale
 # sudo commmand
 # non-privileged user
 # remove apt cache
-RUN apt-get update -q > /dev/null && \
-        apt-get install --no-install-recommends -yq jq apt-utils locales language-pack-en dialog \
-        > /dev/null && \
-        locale-gen $LANGUAGE $LANG && \
-        apt-get -yq install sudo > /dev/null && \
-        echo "nonprivuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-        useradd --no-log-init --home-dir /home/nonprivuser --create-home --shell /bin/bash -u 1000 \
-        nonprivuser && adduser nonprivuser sudo && \
-        apt-get autoremove -y && \
-        apt-get purge -y --auto-remove && \
-        rm -rf /var/lib/apt/lists/*
+RUN apk add --update --no-cache \
+        musl musl-utils musl-locales tzdata sed \
+        sudo bash && \
+        echo "nonprivuser ALL=(ALL) NOPASSWD:ALL /bin/su" >> /etc/sudoers && \
+        addgroup -S nonprivuser && adduser -S nonprivuser -G nonprivuser && \
+        chown -R nonprivuser:nonprivuser /home/nonprivuser && \
+        cp /usr/share/zoneinfo/Europe/London /etc/localtime && \
+        echo 'export LC_ALL=en_US.UTF-8' >> /etc/profile.d/locale.sh && \
+        sed -i 's|LANG=C.UTF-8|LANG=en_US.UTF-8|' /etc/profile.d/locale.sh  && \
+        rm -rf /var/cache/apk/*
 
 # Work dir for GLS Basic Station
 WORKDIR /app
@@ -76,7 +84,7 @@ COPY runner/* ./
 # Set nonpriv user env
 RUN chmod +x *.sh && \
     chown -R nonprivuser /app && \
-    usermod -a -G dialout nonprivuser
+    addgroup nonprivuser dialout
 
 USER nonprivuser
 

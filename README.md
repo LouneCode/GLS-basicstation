@@ -1,5 +1,5 @@
 # GLS Basic Station - with the Fine timestamp support
-This repository provides an **idea** how to add (TDOA) fine timestamp support on LoRa Basics™ Station v2.0.6 version. Repository presents perhaps the world's first (public) implementation of the Basic Station with a Fine timestamp ;). The Concept is still in testing phase, so **please do not use this example implementation in production**.
+This repository provides an **idea** how to add (TDOA) fine timestamp support on LoRa Basics™ Station v2.0.6 version. Repository presents perhaps the world's first (public) implementation of the Basic Station with a Fine timestamp ;).
 
 Repository of the original LoRa Basics™ Station implementation can be found [here](https://github.com/lorabasics/basicstation).
 
@@ -59,33 +59,53 @@ This repository not cover details of the GLS ChirpStack test environment configu
 &nbsp;
 
 ``` sourceCode
+
 $ git clone https://github.com/LouneCode/gls-basicstation.git
 
 ```
 
 &nbsp;
 
-## Compilling Docker image (x86_64-linux-gnu)
+## A) Compilling Docker image (x86_64-linux-gnu)
 
 Go gls-basicstation folder after cloning the repository. Give following commands on command line. 
 
 ``` sourceCode
 
 $ cd gls-basicstation
-$ sudo docker build --network host --build-arg VARIANT=std . -t gls-basicstation:2.0.6.1
+$ sudo docker build --network host --build-arg VARIANT=std --build-arg ARCH=amd64 . -t gls-basicstation:2.0.6.1.Gnu
+
 ```
 &nbsp;
 
-Check images of the container after copilation phase.
+## B) Compilling Docker Alpine image ( aarch64-alpine-linux-musl or x86_64-alpine-linux-musl)
+
+Use the **`aarch64-alpine-linux-musl`** arm64 architecture compilling a Docker image of the GLS Basic station for **`Raspberry Pi 4, CM4`**.  
 
 ``` sourceCode
-$ docker image ls
 
-REPOSITORY                                            TAG             IMAGE ID       CREATED         SIZE
-gls-basicstation                                      2.0.6.1         7bb80ff343b9   26 hours ago    90.4MB
+$ cd gls-basicstation
+$ sudo docker build --network host --build-arg VARIANT=std --build-arg ARCH=x86_64-alpine-linux-musl . -t gls-basicstation:2.0.6.1.Alpine -f Dockerfile-alpine
+
+```
+
+&nbsp;
+
+
+Check images of the container after compilation phase.
+
+``` sourceCode
+
+$ docker images
+
+REPOSITORY                                                TAG              IMAGE ID       CREATED              SIZE
+gls-basicstation                                          2.0.6.1.Alpine   80976a8432fd   About a minute ago   15.8MB
+gls-basicstation                                          2.0.6.1.Gnu      b5bf738aa277   5 minutes ago        112MB
+ubuntu                                                    22.04            58db3edaf2be   2 weeks ago          77.8MB
 ...
 
 ```
+Notice **`the size`** of the Alpine version (15.8MB).
 
 &nbsp;
 
@@ -93,12 +113,12 @@ Configure and run gls-basicstation image in Docker.
 
 ``` sourceCode
 
-$ sudo docker run -d --name=gls-basicstation --device=/dev/ttyACM1:/dev/ttyACM1 \
+$ sudo docker run -d --name=gls-basicstation --device=/dev/ttyACM0:/dev/ttyACM0 \
   --restart=unless-stopped --network=host -e TC_URI="ws://192.168.1.100:3001" \
   -e MODEL="SX1303" -e INTERFACE="USB" -e DESIGN="CORECELL" \
   -e DEVICE="/dev/ttyACM1" -e GATEWAY_EUI="E45F01FFFE1DDCAA" \
   -e TC_KEY="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1fhifq-CeXj1GMMZc......."  \
-  gls-basicstation:2.0.6.1
+  gls-basicstation:2.0.6.1.Alpine
   
 ```
 
@@ -217,13 +237,20 @@ Enable GPIO:   0
 
 ## Compilling the GLS Basic Station Binary (x86_64-linux-gnu)
 
-Run the make command in gls-basicstation repository.
+Run the make command in **`basicstation`** repository.
 
 ``` sourceCode
-cd gls-basicstation
-make platform=corecell variant=std
+
+$ git clone https://github.com/lorabasics/basicstation basicstation
+$ git clone https://github.com/LouneCode/gls-basicstation.git gls-basicstation
+$ cd basicstation
+$ git checkout v2.0.6
+$ git apply ../gls-basicstation/builder/v2.0.6.patch
+$ git apply ../gls-basicstation/builder/GLS_v2.0.6.1.patch
+$ make arch=amd64 platform=corecell variant=std
+
 ```
-Detailed compilling instruction will be found in original [Basic Station](https://github.com/lorabasics/basicstation) repository.
+Compilled files should found in a build-corecell-std folder. Detailed compilling instructions will be found in original [Basic Station](https://github.com/lorabasics/basicstation) repository.
 
 &nbsp;
 
@@ -430,7 +457,7 @@ for any corresponding short options.
 
 The contents of this repository (not of those repositories linked or used by this one) are under BSD 3-Clause License.
 
-Copyright (c) 2022 LouneCode - Only husky in the village <postia.lounelle@live.com>
+Copyright (c) 2023 LouneCode - Only husky in the village <postia.lounelle@live.com>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

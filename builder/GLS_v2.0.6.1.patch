@@ -1,0 +1,243 @@
+﻿diff --git a/setup.gmk b/setup.gmk
+index 55d74c1..8c2f4a1 100644
+--- a/setup.gmk
++++ b/setup.gmk
+@@ -52,6 +52,8 @@ ARCH.corecell.default  = arm-linux-gnueabihf
+ ARCH.corecell.armv6l  = arm-linux-gnueabi
+ ARCH.corecell.armv7hf  = arm-linux-gnueabihf
+ ARCH.corecell.aarch64  = aarch64-linux-gnu
++ARCH.corecell.aarch64-alpine-linux-musl = aarch64-alpine-linux-musl
++ARCH.corecell.x86_64-alpine-linux-musl = x86_64-alpine-linux-musl
+ ARCH.corecell.amd64  = x86_64-linux-gnu
+ ARCH.rpi.default  = arm-linux-gnueabihf
+ ARCH.rpi.armv6l  = arm-linux-gnueabi
+@@ -153,7 +155,13 @@ CFLAGS.linux.std      = -g -O3
+ LIBS.linux   = -llgw   ${MBEDLIBS}      -lpthread
+ LIBS.linuxV2 = -llgw2  ${MBEDLIBS} -lrt -lpthread -lspi
+ LIBS.linuxpico = -llgw ${MBEDLIBS}      -lpthread
+-LIBS.corecell = -llgw1302  ${MBEDLIBS}      -lpthread -lrt
++ifeq (${ARCH},x86_64-alpine-linux-musl)
++  LIBS.corecell = -llgw1302  ${MBEDLIBS}      -lpthread -lrt /usr/lib/libargp.a
++else ifeq (${ARCH},aarch64-alpine-linux-musl)
++  LIBS.corecell = -llgw1302  ${MBEDLIBS}      -lpthread -lrt /usr/lib/libargp.a
++else
++  LIBS.corecell = -llgw1302  ${MBEDLIBS}      -lpthread -lrt
++endif
+ LIBS.rpi     = -llgw   ${MBEDLIBS}      -lpthread
+ LIBS.kerlink = -llgw   ${MBEDLIBS} -lrt -lpthread
+ 
+diff --git a/src-linux/ral_master.c b/src-linux/ral_master.c
+index 3fa397b..91b3828 100644
+--- a/src-linux/ral_master.c
++++ b/src-linux/ral_master.c
+@@ -162,6 +162,9 @@ static int read_slave_pipe (slave_t* slave, u1_t* buf, int bufsize, int expcmd,
+                     rxjob->rssi = resp->rssi;
+                     rxjob->snr = resp->snr;
+                     rxjob->dr = s2e_rps2dr(&TC->s2ctx, resp->rps);
++#if defined(CFG_sx1302)
++                    rxjob->fts = resp->fts;
++#endif
+                     if( rxjob->dr == DR_ILLEGAL ) {
+                         LOG(MOD_RAL|ERROR, "Unable to map to an up DR: %R", resp->rps);
+                     } else {
+diff --git a/src-linux/ral_slave.c b/src-linux/ral_slave.c
+index 55ffc96..9f5e19d 100644
+--- a/src-linux/ral_slave.c
++++ b/src-linux/ral_slave.c
+@@ -127,6 +127,8 @@ static void rx_polling (tmr_t* tmr) {
+             resp.freq   = p->freq_hz;
+ #if defined(CFG_sx1302)
+             resp.rssi  = (u1_t)-p->rssis;
++            // Set fine timestamp on
++            resp.fts = p->ftime_received ? (u4_t)p->ftime : -1;
+ #else
+             resp.rssi  = (u1_t)-p->rssi;
+ #endif
+diff --git a/src-linux/ralsub.h b/src-linux/ralsub.h
+index b6b0897..261c84a 100644
+--- a/src-linux/ralsub.h
++++ b/src-linux/ralsub.h
+@@ -118,6 +118,7 @@ struct ral_rx_resp {
+     rps_t rps;
+     u4_t  freq;
+     sL_t  xtime;
++    s4_t  fts;
+     u1_t  rssi;   // scaled RSSI (*-1)
+     s1_t  snr;    // scaled SNR (*8)
+     u1_t  rxdata[MAX_RXFRAME_LEN];
+diff --git a/src/ral_lgw.c b/src/ral_lgw.c
+index c960acc..12448b6 100644
+--- a/src/ral_lgw.c
++++ b/src/ral_lgw.c
+@@ -333,6 +333,9 @@ static void rxpolling (tmr_t* tmr) {
+         rxjob->xtime = ts_xticks2xtime(pkt_rx.count_us, last_xtime);
+ #if defined(CFG_sx1302)
+         rxjob->rssi  = (u1_t)-pkt_rx.rssis;
++
++        // Set fine timestamp on
++        rxjob->fts = pkt_rx.ftime_received ? (u4_t)pkt_rx.ftime : -1;
+ #else
+         rxjob->rssi  = (u1_t)-pkt_rx.rssi;
+ #endif
+diff --git a/src/s2e.c b/src/s2e.c
+index 6a9c009..73b7356 100644
+--- a/src/s2e.c
++++ b/src/s2e.c
+@@ -123,9 +123,26 @@ void s2e_addRxjob (s2ctx_t* s2ctx, rxjob_t* rxjob) {
+         if( p->dr == rxjob->dr &&
+             p->len == rxjob->len &&
+             memcmp(&s2ctx->rxq.rxdata[p->off], &s2ctx->rxq.rxdata[rxjob->off], rxjob->len) == 0 ) {
++
+             // Duplicate detected - drop the mirror
+             if( (8*rxjob->snr - rxjob->rssi) > (8*p->snr - p->rssi) ) {
+-                // Drop previous frame p
++                
++                if (p->fts > -1) {
++                    // Copy a fine timestamp previous mirror frame if it missing. 
++                    // This can happen if the frame was received via multiple modems at the same time and the (fine) timestamp flag is not set on the other modem?
++                    //
++                    // SX1303 Datasheet Rev 1.2 DS.SX1303.W.APP, Oct 2020 - 7. Detection Engine - Modems 
++                    //      Timestamp for all Spreading Factors:
++                    //      Up to 8 packets at Spreading Factor SF5-12 can be received at any time, including, at most, 4 packets at SF11 and/or SF12.
++                    //      All these packets will be timestamped.
++
++                    if (rxjob->fts == -1) {
++                        LOG(MOD_S2E|DEBUG, "Copy the fine timestamp [%d] of the previous mirror frame before drop it.", p->fts);
++                    rxjob->fts = p->fts;            
++                    }
++                }
++
++                // Drop previous frame
+                 LOG(MOD_S2E|DEBUG, "Dropped mirror frame freq=%F snr=%5.1f rssi=%d (vs. freq=%F snr=%5.1f rssi=%d) - DR%d mic=%d (%d bytes)",
+                     p->freq, p->snr/4.0, -p->rssi, rxjob->freq, rxjob->snr/4.0, -rxjob->rssi,
+                     p->dr, (s4_t)rt_rlsbf4(&s2ctx->rxq.rxdata[p->off]+rxjob->len-4), p->len);
+@@ -156,8 +173,8 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
+         rxjob_t* j = &s2ctx->rxq.rxjobs[s2ctx->rxq.first++];
+         dbuf_t lbuf = { .buf = NULL };
+         if( log_special(MOD_S2E|VERBOSE, &lbuf) )
+-            xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX - ",
+-                    j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime);
++            xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX fts=%d - ",
++                    j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime, j->fts);
+ 
+         uj_encOpen(&sendbuf, '{');
+         if( !s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL) ) {
+@@ -172,6 +189,7 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
+             reftime = s2ctx->muxtime +
+                 ts_normalizeTimespanMCU(rt_getTime()-s2ctx->reftime) / 1e6;
+         }
++
+         uj_encKVn(&sendbuf,
+                   "RefTime",  'T', reftime,
+                   "DR",       'i', j->dr,
+@@ -183,7 +201,8 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
+                   /**/ "fts",     'i', j->fts,
+                   /**/ "rssi",    'i', -(s4_t)j->rssi,
+                   /**/ "snr",     'g', j->snr/4.0,
+-                  /**/ "rxtime",  'T', rt_getUTC()/1e6,
++                  // Append fractal part of the fine timestap (fts) to rxtime if exsist.
++                  /**/ "rxtime",  'T', j->fts > -1 ? (sL_t)(rt_getUTC()/1e6) + (double)j->fts/1e9 : rt_getUTC()/1e6,
+                   "}",
+                   NULL);
+         uj_encClose(&sendbuf, '}');
+diff --git a/src/sx130xconf.c b/src/sx130xconf.c
+index b7a33b0..4d46efc 100644
+--- a/src/sx130xconf.c
++++ b/src/sx130xconf.c
+@@ -254,6 +254,20 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
+         }
+         case J_pps: {
+             sx130xconf->pps = uj_bool(D);
++
++#if defined(CFG_sx1302) 
++            // Set fine stamping on if PPS is enabled in station.conf configuration.  
++            if (sx130xconf->pps == true ) {
++                sx130xconf->ftime.enable = true; 
++                sx130xconf->ftime.mode = LGW_FTIME_MODE_ALL_SF;  //loragw_hal.h // fine timestamps for SF5 -> SF12
++
++                if(lgw_ftime_setconf(&sx130xconf->ftime) != LGW_HAL_SUCCESS ) {
++                  LOG(MOD_RAL|ERROR, "Set fine timestamp -> lgw_ftime_setconf() failed.");
++                }
++                LOG(MOD_RAL|INFO, "Fine timestamp %s.",sx130xconf->pps == true?"enabled":"disabled")
++            }
++#endif
++
+             break;
+         }
+         case J_clksrc: {
+diff --git a/src/sx130xconf.h b/src/sx130xconf.h
+index 70531e8..9b49e2f 100644
+--- a/src/sx130xconf.h
++++ b/src/sx130xconf.h
+@@ -50,7 +50,9 @@ struct sx130xconf {
+     struct lgw_tx_gain_lut_s txlut;
+     struct lgw_conf_rxrf_s   rfconf[LGW_RF_CHAIN_NB];
+     struct lgw_conf_rxif_s   ifconf[LGW_IF_CHAIN_NB];
+-#if !defined(CFG_sx1302)
++#if defined(CFG_sx1302)
++    struct lgw_conf_ftime_s  ftime; // Fine timestamp structure for SX1302, SX1303.
++#else
+     struct lgw_conf_lbt_s    lbt;
+ #endif
+     s2_t  txpowAdjust;   // assuming there is only one TX path / SX130X (scaled by TXPOW_SCALE)
+diff --git a/src/uj.c b/src/uj.c
+index 12949f7..3010e97 100644
+--- a/src/uj.c
++++ b/src/uj.c
+@@ -784,6 +784,12 @@ void uj_encTime(ujbuf_t* b, double val) {
+     b->pos += n;
+ }
+ 
++void uj_encFTime(ujbuf_t* b, double val) {
++    anotherValue(b);
++    int n = snprintf(b->buf + b->pos, b->bufsize - b->pos, "%.9f", val);
++    b->pos += n;
++}
++
+ void uj_encStr (ujbuf_t* b, const char* s) {
+     if( s == NULL ) {
+         uj_encNull(b);
+@@ -909,18 +915,19 @@ void uj_encKey (ujbuf_t* b, const char* key) {
+ 
+ static int encArg(ujbuf_t* b, int type, va_list* args) {
+     switch(type) {
+-    case 'b': uj_encBool(b, va_arg(*args,      int)); break;
+-    case 'i': uj_encInt (b, va_arg(*args,      int)); break;
+-    case 'I': uj_encInt (b, va_arg(*args,     sL_t)); break;
+-    case 'u': uj_encUint(b, va_arg(*args, unsigned)); break;
+-    case 'U': uj_encUint(b, va_arg(*args,     uL_t)); break;
+-    case 'D': uj_encDate(b, va_arg(*args,     uL_t)); break;
+-    case 'g': uj_encNum (b, va_arg(*args,   double)); break;
+-    case 'T': uj_encTime(b, va_arg(*args,   double)); break;
+-    case 's': uj_encStr (b, va_arg(*args,    char*)); break;
+-    case 'E': uj_encEui (b, va_arg(*args,     uL_t)); break;
+-    case 'M': uj_encMac (b, va_arg(*args,     uL_t)); break;
+-    case '6': uj_encId6 (b, va_arg(*args,     uL_t)); break;
++    case 'b': uj_encBool (b, va_arg(*args,      int)); break;
++    case 'i': uj_encInt  (b, va_arg(*args,      int)); break;
++    case 'I': uj_encInt  (b, va_arg(*args,     sL_t)); break;
++    case 'u': uj_encUint (b, va_arg(*args, unsigned)); break;
++    case 'U': uj_encUint (b, va_arg(*args,     uL_t)); break;
++    case 'D': uj_encDate (b, va_arg(*args,     uL_t)); break;
++    case 'g': uj_encNum  (b, va_arg(*args,   double)); break;
++    case 'T': uj_encTime (b, va_arg(*args,   double)); break;
++    case 'F': uj_encFTime(b, va_arg(*args,   double)); break;
++    case 's': uj_encStr  (b, va_arg(*args,    char*)); break;
++    case 'E': uj_encEui  (b, va_arg(*args,     uL_t)); break;
++    case 'M': uj_encMac  (b, va_arg(*args,     uL_t)); break;
++    case '6': uj_encId6  (b, va_arg(*args,     uL_t)); break;
+     case 'H': {
+         int dl = va_arg(*args, int);
+         const u1_t* d = va_arg(*args, const u1_t*);
+diff --git a/src/uj.h b/src/uj.h
+index 825bf52..b664b35 100644
+--- a/src/uj.h
++++ b/src/uj.h
+@@ -122,6 +122,7 @@ void uj_encInt  (ujbuf_t* buf, sL_t val);
+ void uj_encUint (ujbuf_t* buf, uL_t val);
+ void uj_encNum  (ujbuf_t* buf, double val);
+ void uj_encTime (ujbuf_t* buf, double val);
++void uj_encFTime (ujbuf_t* buf, double val);
+ void uj_encDate (ujbuf_t* buf, uL_t date);
+ void uj_encKey  (ujbuf_t* buf, const char* key);
+ void uj_encStr  (ujbuf_t* buf, const char* s);
