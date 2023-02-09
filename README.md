@@ -250,7 +250,7 @@ $ git apply ../gls-basicstation/builder/GLS_v2.0.6.1.patch
 $ make arch=amd64 platform=corecell variant=std
 
 ```
-Compilled files should found in a build-corecell-std folder. Detailed compilling instructions will be found in original [Basic Station](https://github.com/lorabasics/basicstation) repository.
+Compiled files should found in a build-corecell-std folder. Detailed compilling instructions will be found in original [Basic Station](https://github.com/lorabasics/basicstation) repository.
 
 &nbsp;
 
