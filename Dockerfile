@@ -55,7 +55,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # non-privileged user
 # remove apt cache
 RUN apt-get update -q > /dev/null && \
-        apt-get install --no-install-recommends -yq jq apt-utils locales language-pack-en dialog \
+        apt-get install --no-install-recommends -yq jq apt-utils locales language-pack-en dialog gpiod \
         > /dev/null && \
         locale-gen $LANGUAGE $LANG && \
         apt-get -yq install sudo > /dev/null && \
