@@ -64,7 +64,7 @@ ENV container=docker TERM=xterm LC_ALL=en_US LANGUAGE=en_US LANG=en_US.UTF-8 TZ=
 # non-privileged user
 # remove apt cache
 RUN apk add --update --no-cache \
-        musl musl-utils musl-locales tzdata sed \
+        musl musl-utils musl-locales tzdata sed jq \
         sudo bash libgpiod && \
         echo "nonprivuser ALL=(ALL) NOPASSWD:ALL /bin/su" >> /etc/sudoers && \
         addgroup -S nonprivuser && adduser -S nonprivuser -G nonprivuser && \
