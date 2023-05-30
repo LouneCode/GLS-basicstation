@@ -130,16 +130,6 @@ index 6a9c009..73b7356 100644
          uj_encKVn(&sendbuf,
                    "RefTime",  'T', reftime,
                    "DR",       'i', j->dr,
-@@ -183,7 +201,8 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
-                   /**/ "fts",     'i', j->fts,
-                   /**/ "rssi",    'i', -(s4_t)j->rssi,
-                   /**/ "snr",     'g', j->snr/4.0,
--                  /**/ "rxtime",  'T', rt_getUTC()/1e6,
-+                  // Append fractal part of the fine timestap (fts) to rxtime if exsist.
-+                  /**/ "rxtime",  'T', j->fts > -1 ? (sL_t)(rt_getUTC()/1e6) + (double)j->fts/1e9 : rt_getUTC()/1e6,
-                   "}",
-                   NULL);
-         uj_encClose(&sendbuf, '}');
 diff --git a/src/sx130xconf.c b/src/sx130xconf.c
 index b7a33b0..4d46efc 100644
 --- a/src/sx130xconf.c
